@@ -1,0 +1,12 @@
+wandb>=0.12.0
+
+# Data processing
+opencv-python>=4.5.0
+Pillow>=8.0.0
+numpy>=1.21.0
+
+# Evaluation and visualization
+matplotlib>=3.4.0
+seaborn>=0.11.0
+scikit-image>=0.18.0
+ipywidgets>=7.6.0
