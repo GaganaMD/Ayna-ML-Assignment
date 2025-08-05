@@ -7,15 +7,15 @@ from utils.dataset import PolygonColorDataset
 
 from sklearn.metrics import mean_squared_error
 from skimage.metrics import structural_similarity as ssim
-
 from PIL import Image
 import matplotlib.pyplot as plt
 
-# --- Setup ---
+# --- Configuration ---
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path = 'checkpoints/best_model.pt'
 data_dir = 'dataset/validation'
 json_path = 'dataset/validation/data.json'
+batch_size = 1
 
 color2idx = {
     'yellow': 0,
@@ -28,9 +28,13 @@ color2idx = {
     'green': 7
 }
 
-transform = transforms.Compose([transforms.ToTensor()])
+# --- Dataset & DataLoader ---
+transform = transforms.Compose([
+    transforms.ToTensor(),
+])
+
 val_dataset = PolygonColorDataset(data_dir, json_path, color2idx, transform=transform)
-val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 # --- Model ---
 model = UNetFiLM(num_colors=len(color2idx))
@@ -42,10 +46,7 @@ else:
 model.to(device)
 model.eval()
 
-# --- Evaluation ---
-total_mse = 0
-total_ssim = 0
-num_samples = 0
+total_mse, total_ssim, num_samples = 0, 0, 0
 
 with torch.no_grad():
     for batch in val_loader:
@@ -55,27 +56,32 @@ with torch.no_grad():
         targets = targets.to(device)
 
         outputs = model(imgs, color_idx)
-        outputs = torch.clamp(outputs, 0, 1)  # Ensure valid range
-        
-        # Move to cpu, convert to numpy
-        pred_np = outputs.squeeze().cpu().numpy().transpose(1,2,0)
-        target_np = targets.squeeze().cpu().numpy().transpose(1,2,0)
-        
-        mse = mean_squared_error(pred_np.flatten(), target_np.flatten())
-        ssim_score = ssim(pred_np, target_np, multichannel=True, data_range=1.0)
-        
+        outputs = torch.clamp(outputs, 0, 1)
+
+        # Convert to numpy arrays (H, W, C)
+        pred_np = outputs.squeeze().cpu().numpy().transpose(1, 2, 0)
+        target_np = targets.squeeze().cpu().numpy().transpose(1, 2, 0)
+
+        # --- Resize predicted output to match target ---
+        pred_img = Image.fromarray((pred_np * 255).astype(np.uint8))
+        pred_img_resized = pred_img.resize((target_np.shape[1], target_np.shape[0]), Image.BILINEAR)
+        resized_pred_np = np.array(pred_img_resized) / 255.0
+
+        # --- Metrics ---
+        mse = mean_squared_error(resized_pred_np.flatten(), target_np.flatten())
+        ssim_score = ssim(resized_pred_np, target_np, channel_axis=-1, data_range=1.0)
         total_mse += mse
         total_ssim += ssim_score
         num_samples += 1
 
-        # OPTIONAL: visualize a few outputs
+        # visualize the first few samples
         if num_samples <= 5:
             fig, axs = plt.subplots(1, 3, figsize=(9, 3))
-            axs[0].imshow(imgs.squeeze().cpu().numpy().transpose(1,2,0))
+            axs[0].imshow(imgs.squeeze().cpu().numpy().transpose(1, 2, 0))
             axs[0].set_title('Input Polygon')
             axs[1].imshow(target_np)
             axs[1].set_title('Target Output')
-            axs[2].imshow(pred_np)
+            axs[2].imshow(resized_pred_np)
             axs[2].set_title('Model Output')
             plt.show()
 
