@@ -6,30 +6,31 @@ import numpy as np
 
 
 class PolygonColorDataset(Dataset):
-    def __init__(self, root, json_path, color2idx, transform=None):
-        super().__init__()
-        with open(json_path, 'r') as f:
-            self.mapping = json.load(f)
-        self.root = root
-        self.color2idx = color2idx
+    
+    def __init__(self, data_dir, transform=None):
+        self.data_dir = data_dir
         self.transform = transform
 
+        # Load metadata
+        with open(os.path.join(data_dir, 'data.json')) as f:
+            self.data = json.load(f)
+
     def __len__(self):
-        return len(self.mapping)
+        return len(self.data)
 
     def __getitem__(self, idx):
-        rec = self.mapping[idx]
-        img_x = Image.open(os.path.join(self.root, "inputs", rec['input'])).convert('L')
-        img_y = Image.open(os.path.join(self.root, "outputs", rec['output'])).convert('RGB')
-        color = rec['color']
-        # Preprocess
+        sample = self.data[idx]
+
+        # Use the correct keys from your JSON
+        input_path = os.path.join(self.data_dir, 'inputs', sample['input_polygon'])
+        output_path = os.path.join(self.data_dir, 'outputs', sample['output_image'])
+
+        input_image = Image.open(input_path).convert("RGB")
+        output_image = Image.open(output_path).convert("RGB")
+
         if self.transform:
-            img_x = self.transform(img_x)
-            img_y = self.transform(img_y)
-        else:
-            img_x = np.array(img_x, dtype=np.float32) / 255.0
-            img_x = np.expand_dims(img_x, axis=0)
-            img_y = np.array(img_y, dtype=np.float32) / 255.0
-            img_y = img_y.transpose(2,0,1)
-            img_x, img_y = torch.tensor(img_x), torch.tensor(img_y)
-        return img_x, self.color2idx[color], img_y
+            input_image = self.transform(input_image)
+            output_image = self.transform(output_image)
+
+        return input_image, output_image
+
