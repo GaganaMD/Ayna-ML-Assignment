@@ -4,7 +4,7 @@
 
 ### 🛤️ Methodology & Evolution
 
-Our conditional polygon colorization system was built and improved through five major iterations, progressively fixing each observed limitation until robust, color-accurate results were obtained:
+Our conditional polygon colorization system was built and improved through six major iterations, progressively fixing each observed limitation until robust, color-accurate results were obtained:
 
 #### 1. Vanilla UNet (No Conditioning)
 
@@ -30,7 +30,7 @@ Our conditional polygon colorization system was built and improved through five 
 * **Problem**: Earlier and deeper color conditioning eliminated most issues; model could now fill any shape with any requested color.
 * **Outcome**: Robust, strong color-conditional generation.
 
-#### 5. Hybrid Loss & Explicit Color Classification Head (**Final**)
+#### 5. Hybrid Loss & Explicit Color Classification Head
 
 * **Diagnosis**: Occasionally, merely using L1/pixel loss permitted small but consequential color errors, especially with visually “close” colors.
 * **Solution**:
@@ -41,15 +41,25 @@ Our conditional polygon colorization system was built and improved through five 
   * **Training**: The final loss is `L1_loss + CrossEntropy_loss` to strongly penalize color mistakes even when structural loss is small.
 * **Outcome**: The model now yields perfectly color-accurate and shape-accurate results—robust to all color-shape combinations, no color confusion, and strongest overall performance.
 
+#### 6. Multi-Resolution Discriminator for Realism
+
+* **Diagnosis**: Though color and structure were accurate, outputs sometimes lacked sharpness or realism in edge boundaries.
+* **Solution**:
+
+  * Introduced a **multi-resolution PatchGAN discriminator** as part of an adversarial setup to critique realism.
+  * Trained the generator (UNet) and discriminator jointly, using **adversarial loss** in addition to hybrid loss.
+* **Outcome**: Enhanced edge fidelity and perceptual quality, preserving color conditioning and improving visual sharpness across fine structures.
+
 ### Summary Table of Iterative Improvements
 
-| Iteration | Change                                         | Problem Addressed                       | Outcome                            |
-| --------- | ---------------------------------------------- | --------------------------------------- | ---------------------------------- |
-| 1         | Baseline UNet, no color input                  | No way to pick output color             | Model outputs average color        |
-| 2         | Color embedding + FiLM at bottleneck           | Weak, late conditioning                 | Partial color control, mistakes    |
-| 3         | Unified color2idx mapping, balanced sets       | Color swap confusion                    | Stable mapping, correct color use  |
-| 4         | Embedding concat as input + FiLM at bottleneck | Weak/late conditioning, mode collapse   | Robust, accurate color fills       |
-| 5         | Hybrid loss + color classification head        | L1 loss insufficient for color accuracy | Best color accuracy, perfect fills |
+| Iteration | Change                                         | Problem Addressed                       | Outcome                               |
+| --------- | ---------------------------------------------- | --------------------------------------- | ------------------------------------- |
+| 1         | Baseline UNet, no color input                  | No way to pick output color             | Model outputs average color           |
+| 2         | Color embedding + FiLM at bottleneck           | Weak, late conditioning                 | Partial color control, mistakes       |
+| 3         | Unified color2idx mapping, balanced sets       | Color swap confusion                    | Stable mapping, correct color use     |
+| 4         | Embedding concat as input + FiLM at bottleneck | Weak/late conditioning, mode collapse   | Robust, accurate color fills          |
+| 5         | Hybrid loss + color classification head        | L1 loss insufficient for color accuracy | Best color accuracy, perfect fills    |
+| 6         | Multi-resolution discriminator + GAN loss      | Output realism and sharpness            | Realistic, sharper and faithful fills |
 
 ---
 
@@ -59,18 +69,19 @@ Our conditional polygon colorization system was built and improved through five 
 * **Maintain consistent label mappings**: One `color2idx` mapping always.
 * **Hybrid loss is crucial**: Using both L1 (for structure) and cross-entropy (for color correctness) maximizes fidelity.
 * **Explicit color head guides learning**: Classification loss makes the model “care” about getting the color exactly right.
+* **Adversarial training refines sharpness**: GAN loss helps improve visual quality.
 * **Balance data**: All color/shape combos must be present to ensure generalization.
 
 ---
 
-### 🛠️ Final Model Configuration (5th Iteration)
+### 🛠️ Final Model Configuration (6th Iteration)
 
-* **Architecture**: Custom Conditional UNet with:
+* **Architecture**: Custom Conditional UNet (Generator) + Multi-resolution PatchGAN Discriminator
 
   * **Input**: \[Batch, 3 (RGB) + EmbeddingDim, H, W]: image and broadcasted color embedding
   * **Color Conditioning**: Embedding via `nn.Embedding`, used both as input concatenation and FiLM scale/bias at bottleneck
   * **Color Classification Head**: Predicts color class at bottleneck
-* **Loss**: `L1_loss + CrossEntropy_loss`
+* **Loss**: `L1_loss + CrossEntropy_loss + GAN_loss`
 
 #### Hyperparameters
 
@@ -86,6 +97,8 @@ Our conditional polygon colorization system was built and improved through five 
 * SSIM
 
 * Color classification accuracy
+
+* GAN loss curve
 
 * **Experiment Tracking**: Weights & Biases (WandB)
 
@@ -122,3 +135,4 @@ python inference.py
 
 ---
 
+Happy experimenting! 🌈
