@@ -4,6 +4,7 @@ import torch.nn as nn
 class ConditionalUNet(nn.Module):
     def __init__(self, num_colors, color_embed_dim=64):
         super().__init__()
+        self.num_colors = num_colors
         self.color_emb = nn.Embedding(num_colors, color_embed_dim)
         filters = [32, 64, 128, 256]
 
@@ -33,7 +34,17 @@ class ConditionalUNet(nn.Module):
         self.up0 = nn.ConvTranspose2d(filters[1], filters[0], 2, stride=2)
         self.dec1 = self._block(filters[1], filters[0])
 
+        # Image output head
         self.final = nn.Conv2d(filters[0], 3, 1)
+
+        # NEW: Color classification head
+        self.color_classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+            nn.Linear(filters[3], filters[3]),
+            nn.ReLU(),
+            nn.Linear(filters[3], num_colors)
+        )
 
     def _block(self, in_channels, out_channels):
         return nn.Sequential(
@@ -55,6 +66,10 @@ class ConditionalUNet(nn.Module):
         x3 = self.enc3(self.pool(x2))
 
         b = self.bottleneck_conv(self.pool(x3))
+
+        # NEW: Get color classification prediction before FiLM
+        color_logits = self.color_classifier(b)
+
         gamma = self.color_proj_gamma(cond_vec).unsqueeze(-1).unsqueeze(-1)
         beta = self.color_proj_beta(cond_vec).unsqueeze(-1).unsqueeze(-1)
         b = gamma * b + beta
@@ -71,5 +86,7 @@ class ConditionalUNet(nn.Module):
         d1 = torch.cat([d1, x1], dim=1)
         d1 = self.dec1(d1)
 
-        out = self.final(d1)
-        return torch.sigmoid(out)
+        out_img = self.final(d1)
+        
+        # NEW: Return both the image and the color logits
+        return torch.sigmoid(out_img), color_logits

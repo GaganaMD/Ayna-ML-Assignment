@@ -53,7 +53,8 @@ with torch.no_grad():
         color_idx = color_idx.to(device)
         targets = targets.to(device)
 
-        outputs = model(imgs, color_idx)
+        # NEW: Unpack the two outputs. We only need the image for visualization.
+        outputs, _ = model(imgs, color_idx)
         outputs = torch.clamp(outputs, 0, 1)
 
         pred_np = outputs.squeeze().cpu().numpy().transpose(1, 2, 0)
