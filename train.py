@@ -26,7 +26,6 @@ def train(args):
     model = ConditionalUNet(num_colors=len(color2idx)).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # NEW: Define two loss functions
     image_loss_fn = lambda pred_img, target_img: F.l1_loss(F.interpolate(pred_img, size=target_img.shape[2:], mode='bilinear', align_corners=False), target_img)
     color_loss_fn = nn.CrossEntropyLoss()
 
@@ -40,15 +39,13 @@ def train(args):
         for img, color, tgt in tr_loader:
             img, color, tgt = img.to(device), color.to(device), tgt.to(device)
             
-            # NEW: Model returns two outputs
             pred_img, pred_color_logits = model(img, color)
             
-            # Calculate and combine the losses
             image_loss = image_loss_fn(pred_img, tgt)
             color_loss = color_loss_fn(pred_color_logits, color)
             
-            # NEW: Weighted combination of the two losses. Adjust the weight (e.g., 0.1) as needed.
-            loss = image_loss + 0.1 * color_loss
+            # CORRECTED: The weight for the color loss is now much smaller
+            loss = image_loss + 0.001 * color_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -62,12 +59,11 @@ def train(args):
             for img, color, tgt in va_loader:
                 img, color, tgt = img.to(device), color.to(device), tgt.to(device)
                 
-                # NEW: Model returns two outputs
                 pred_img, pred_color_logits = model(img, color)
 
                 image_loss = image_loss_fn(pred_img, tgt)
                 color_loss = color_loss_fn(pred_color_logits, color)
-                loss = image_loss + 0.1 * color_loss
+                loss = image_loss + 0.001 * color_loss
 
                 val_loss += loss.item() * img.size(0)
         val_loss /= len(va_loader.dataset)
@@ -76,7 +72,6 @@ def train(args):
 
         if val_loss < best_val:
             best_val = val_loss
-            # NEW: Save the model
             torch.save({'model': model.state_dict(), 'color2idx': color2idx}, f"{args.out_dir}/best_model.pt")
 
         print(f"Epoch {epoch} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")

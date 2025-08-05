@@ -67,7 +67,6 @@ class ConditionalUNet(nn.Module):
 
         b = self.bottleneck_conv(self.pool(x3))
 
-        # NEW: Get color classification prediction before FiLM
         color_logits = self.color_classifier(b)
 
         gamma = self.color_proj_gamma(cond_vec).unsqueeze(-1).unsqueeze(-1)
@@ -88,5 +87,4 @@ class ConditionalUNet(nn.Module):
 
         out_img = self.final(d1)
         
-        # NEW: Return both the image and the color logits
         return torch.sigmoid(out_img), color_logits
