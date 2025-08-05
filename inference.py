@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import numpy as np
-from model.unet_film import PolygonUNetConditioned
+from model.unet_film import ConditionalUNet
 from utils.dataset import PolygonColorDataset
 from sklearn.metrics import mean_squared_error
 from skimage.metrics import structural_similarity as ssim
@@ -35,7 +35,7 @@ val_dataset = PolygonColorDataset(data_dir, json_path, color2idx, transform=tran
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 # --- Model ---
-model = PolygonUNetConditioned(num_colors=len(color2idx), image_size=128, context_dim=32)
+model = ConditionalUNet(num_colors=len(color2idx))
 checkpoint = torch.load(model_path, map_location=device)
 if 'model' in checkpoint:
     model.load_state_dict(checkpoint['model'])

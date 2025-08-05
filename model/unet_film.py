@@ -1,28 +1,70 @@
 import torch
 import torch.nn as nn
-from diffusers import UNet2DConditionModel
+import torch.nn.functional as F
 
-class PolygonUNetConditioned(nn.Module):
-    def __init__(self, num_colors, image_size=128, context_dim=32):
+class ConditionalUNet(nn.Module):
+    def __init__(self, num_colors, color_embed_dim=64):
         super().__init__()
-        # Learnable embedding for each color index
-        self.color_emb = nn.Embedding(num_colors, context_dim)
-        # Hugging Face conditional U-Net
-        self.unet = UNet2DConditionModel(
-            sample_size=image_size,
-            in_channels=3,       # RGB input
-            out_channels=3,      # RGB output
-            layers_per_block=2,
-            block_out_channels=(64, 128, 256, 256),
-            down_block_types=("DownBlock2D", "DownBlock2D", "DownBlock2D", "DownBlock2D"),
-            up_block_types=("UpBlock2D", "UpBlock2D", "UpBlock2D", "UpBlock2D"),
-            cross_attention_dim=context_dim
-        )
-    def forward(self, x, color_idx, timestep=None):
-        context = self.color_emb(color_idx)
-        if timestep is None:
-            # Use dummy timestep (e.g., 0) if not given
-            timestep = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
-        out = self.unet(x, timestep=timestep, encoder_hidden_states=context.unsqueeze(1))
-        return out.sample
+        self.color_emb = nn.Embedding(num_colors, color_embed_dim)
+        filters = [32, 64, 128, 256]
 
+        # Encoder
+        self.enc1 = self._block(3, filters[0])
+        self.enc2 = self._block(filters[0], filters[1])
+        self.enc3 = self._block(filters[1], filters[2])
+        self.pool = nn.MaxPool2d(2)
+
+        # Bottleneck
+        self.bottleneck_conv = self._block(filters[2], filters[3])
+        self.color_proj_gamma = nn.Linear(color_embed_dim, filters[3])
+        self.color_proj_beta = nn.Linear(color_embed_dim, filters[3])
+
+        # Decoder
+        self.up2 = nn.ConvTranspose2d(filters[3], filters[2], 2, stride=2)
+        self.dec3 = self._block(filters[3], filters[2])
+        self.up1 = nn.ConvTranspose2d(filters[2], filters[1], 2, stride=2)
+        self.dec2 = self._block(filters[2], filters[1])
+        self.up0 = nn.ConvTranspose2d(filters[1], filters[0], 2, stride=2)
+        self.dec1 = self._block(filters[1], filters[0])
+
+        self.final = nn.Conv2d(filters[0], 3, 1)
+
+    def _block(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x, color_idx):
+        cond_vec = self.color_emb(color_idx)
+
+        # Encoder
+        x1 = self.enc1(x)
+        x2 = self.enc2(self.pool(x1))
+        x3 = self.enc3(self.pool(x2))
+
+        # Bottleneck with FiLM
+        b = self.bottleneck_conv(self.pool(x3))
+        gamma = self.color_proj_gamma(cond_vec).unsqueeze(-1).unsqueeze(-1)
+        beta = self.color_proj_beta(cond_vec).unsqueeze(-1).unsqueeze(-1)
+        b = gamma * b + beta
+
+        # Decoder
+        d3 = self.up2(b)
+        d3 = torch.cat([d3, x3], dim=1)
+        d3 = self.dec3(d3)
+
+        d2 = self.up1(d3)
+        d2 = torch.cat([d2, x2], dim=1)
+        d2 = self.dec2(d2)
+
+        d1 = self.up0(d2)
+        d1 = torch.cat([d1, x1], dim=1)
+        d1 = self.dec1(d1)
+
+        out = self.final(d1)
+        return torch.sigmoid(out)
