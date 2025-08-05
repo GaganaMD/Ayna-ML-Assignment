@@ -6,11 +6,13 @@ import torch.nn.functional as F
 
 def train(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print ("Device:", device)
+
     # Load color2idx
     import json
     with open(args.train_json, 'r') as f:
         mapping = json.load(f)
-    color_names = sorted(set(rec['color'] for rec in mapping))
+    color_names = sorted(set(rec['colour'] for rec in mapping))
     color2idx = {c:i for i,c in enumerate(color_names)}
     # Datasets/loaders
     train_ds = PolygonColorDataset(args.train_root, args.train_json, color2idx)
@@ -21,8 +23,12 @@ def train(args):
     model = UNetFiLM(num_colors=len(color2idx)).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # Loss settings
-    def loss_fn(pred, target):  
+    def loss_fn(pred, target):
+        # Upsample pred to match target size
+        pred = F.interpolate(pred, size=target.shape[2:], mode='bilinear', align_corners=False)
         l1 = F.l1_loss(pred, target)
+        return l1
+
         mse = F.mse_loss(pred, target)
         return 0.7*l1 + 0.3*mse
     # wandb
@@ -33,6 +39,7 @@ def train(args):
         train_loss = 0.
         for img, color, tgt in tr_loader:
             img, color, tgt = img.to(device), color.to(device), tgt.to(device)
+
             out = model(img, color)
             loss = loss_fn(out, tgt)
             optimizer.zero_grad()
@@ -58,10 +65,10 @@ def train(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train_root", type=str, default="data/training")
-    parser.add_argument("--valid_root", type=str, default="data/validation")
-    parser.add_argument("--train_json", type=str, default="data/training/data.json")
-    parser.add_argument("--valid_json", type=str, default="data/validation/data.json")
+    parser.add_argument("--train_root", type=str, default="dataset/training")
+    parser.add_argument("--valid_root", type=str, default="dataset/validation")
+    parser.add_argument("--train_json", type=str, default="dataset/training/data.json")
+    parser.add_argument("--valid_json", type=str, default="dataset/validation/data.json")
     parser.add_argument("--bs", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=50)

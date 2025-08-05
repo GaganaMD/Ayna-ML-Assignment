@@ -37,7 +37,7 @@ class UNetFiLM(nn.Module):
         self.color_emb = nn.Embedding(num_colors, color_embed_dim)
         filters = [32, 64, 128, 256]
         # Encoder
-        self.enc1 = UNetBlock(1, filters[0], color_embed_dim)
+        self.enc1 = UNetBlock(3, filters[0], color_embed_dim)
         self.enc2 = UNetBlock(filters[0], filters[1], color_embed_dim)
         self.enc3 = UNetBlock(filters[1], filters[2], color_embed_dim)
         self.pool = nn.MaxPool2d(2)
