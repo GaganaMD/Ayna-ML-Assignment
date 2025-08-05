@@ -146,5 +146,3 @@ python inference.py
 * Visualize training curves and inspect predictions
 
 ---
-
-Happy experimenting! 🌈
