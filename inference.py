@@ -56,23 +56,19 @@ with torch.no_grad():
         outputs = model(imgs, color_idx)
         outputs = torch.clamp(outputs, 0, 1)
 
-        # Convert to numpy arrays (H, W, C)
         pred_np = outputs.squeeze().cpu().numpy().transpose(1, 2, 0)
         target_np = targets.squeeze().cpu().numpy().transpose(1, 2, 0)
 
-        # --- Resize predicted output to match target ---
         pred_img = Image.fromarray((pred_np * 255).astype(np.uint8))
         pred_img_resized = pred_img.resize((target_np.shape[1], target_np.shape[0]), Image.BILINEAR)
         resized_pred_np = np.array(pred_img_resized) / 255.0
 
-        # --- Metrics ---
         mse = mean_squared_error(resized_pred_np.flatten(), target_np.flatten())
         ssim_score = ssim(resized_pred_np, target_np, channel_axis=-1, data_range=1.0)
         total_mse += mse
         total_ssim += ssim_score
         num_samples += 1
 
-        # visualize the first few samples
         if num_samples <= 5:
             fig, axs = plt.subplots(1, 3, figsize=(9, 3))
             axs[0].imshow(imgs.squeeze().cpu().numpy().transpose(1, 2, 0))

@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 class ConditionalUNet(nn.Module):
     def __init__(self, num_colors, color_embed_dim=64):
@@ -8,13 +7,20 @@ class ConditionalUNet(nn.Module):
         self.color_emb = nn.Embedding(num_colors, color_embed_dim)
         filters = [32, 64, 128, 256]
 
-        # Encoder
-        self.enc1 = self._block(3, filters[0])
+        # Adjust first conv input channels for image + color embedding map
+        self.enc1 = nn.Sequential(
+            nn.Conv2d(3 + color_embed_dim, filters[0], kernel_size=3, padding=1),
+            nn.BatchNorm2d(filters[0]),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(filters[0], filters[0], kernel_size=3, padding=1),
+            nn.BatchNorm2d(filters[0]),
+            nn.ReLU(inplace=True),
+        )
         self.enc2 = self._block(filters[0], filters[1])
         self.enc3 = self._block(filters[1], filters[2])
         self.pool = nn.MaxPool2d(2)
 
-        # Bottleneck
+        # Bottleneck + FiLM
         self.bottleneck_conv = self._block(filters[2], filters[3])
         self.color_proj_gamma = nn.Linear(color_embed_dim, filters[3])
         self.color_proj_beta = nn.Linear(color_embed_dim, filters[3])
@@ -41,19 +47,18 @@ class ConditionalUNet(nn.Module):
 
     def forward(self, x, color_idx):
         cond_vec = self.color_emb(color_idx)
+        cond_map = cond_vec[:, :, None, None].expand(-1, -1, x.size(2), x.size(3))
+        x_cond = torch.cat([x, cond_map], dim=1)
 
-        # Encoder
-        x1 = self.enc1(x)
+        x1 = self.enc1(x_cond)
         x2 = self.enc2(self.pool(x1))
         x3 = self.enc3(self.pool(x2))
 
-        # Bottleneck with FiLM
         b = self.bottleneck_conv(self.pool(x3))
         gamma = self.color_proj_gamma(cond_vec).unsqueeze(-1).unsqueeze(-1)
         beta = self.color_proj_beta(cond_vec).unsqueeze(-1).unsqueeze(-1)
         b = gamma * b + beta
 
-        # Decoder
         d3 = self.up2(b)
         d3 = torch.cat([d3, x3], dim=1)
         d3 = self.dec3(d3)

@@ -15,7 +15,7 @@ def train(args):
     with open(args.train_json, 'r') as f:
         mapping = json.load(f)
     color_names = sorted(set(rec['colour'] for rec in mapping))
-    color2idx = {c:i for i,c in enumerate(color_names)}
+    color2idx = {c: i for i, c in enumerate(color_names)}
 
     train_ds = PolygonColorDataset(args.train_root, args.train_json, color2idx)
     valid_ds = PolygonColorDataset(args.valid_root, args.valid_json, color2idx)
@@ -27,8 +27,7 @@ def train(args):
 
     def loss_fn(pred, target):
         pred = F.interpolate(pred, size=target.shape[2:], mode='bilinear', align_corners=False)
-        l1 = F.l1_loss(pred, target)
-        return l1
+        return F.l1_loss(pred, target)
 
     wandb.init(project=args.wandb_proj, config=vars(args))
 
