@@ -1,0 +1,75 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            s7bc9qckp0x0mkkfdlr6jlspa7ql750o:
+                codePath: train.py
+                codePathLocal: train.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                cudaVersion: "12.8"
+                disk:
+                    /:
+                        total: "457019748352"
+                        used: "231102144512"
+                email: gmd@worlddisastercenter.org
+                executable: C:\Users\gagan\Desktop\Ayna-ML-Assignment\venv\Scripts\python.exe
+                git:
+                    commit: e97c4d722d88c84e5f5ca1eaf8d0c47469a0ae92
+                    remote: https://github.com/GaganaMD/Ayna-ML-Assignment.git
+                gpu: NVIDIA GeForce RTX 3060 Laptop GPU
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 3840
+                      memoryTotal: "6442450944"
+                      name: NVIDIA GeForce RTX 3060 Laptop GPU
+                      uuid: GPU-5516b0be-576f-333d-1930-9dabf1559ef5
+                host: Gagana
+                memory:
+                    total: "16948453376"
+                os: Windows-10-10.0.26100-SP0
+                program: C:\Users\gagan\Desktop\Ayna-ML-Assignment\train.py
+                python: CPython 3.11.13
+                root: C:\Users\gagan\Desktop\Ayna-ML-Assignment
+                startedAt: "2025-08-05T12:13:38.492393Z"
+                writerId: s7bc9qckp0x0mkkfdlr6jlspa7ql750o
+        m: []
+        python_version: 3.11.13
+        t:
+            "1":
+                - 1
+                - 41
+                - 49
+                - 83
+            "2":
+                - 1
+                - 41
+                - 49
+                - 83
+            "3":
+                - 16
+            "4": 3.11.13
+            "5": 0.21.0
+            "8":
+                - 3
+            "12": 0.21.0
+            "13": windows-amd64
+bs:
+    value: 16
+epochs:
+    value: 50
+lr:
+    value: 0.001
+out_dir:
+    value: checkpoints/
+train_json:
+    value: dataset/training/data.json
+train_root:
+    value: dataset/training
+valid_json:
+    value: dataset/validation/data.json
+valid_root:
+    value: dataset/validation
+wandb_proj:
+    value: unet-polygon-colorization-intern
